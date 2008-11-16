@@ -6,7 +6,7 @@ use Parse::RecDescent;
 use strict;
 use warnings;
 
-our $VERSION = '0.00_01';
+our $VERSION = '0.00_02';
 
 my $parser = Parse::RecDescent->new (<<'EOF');
 config:
@@ -157,7 +157,7 @@ __END__
 
 =head1 NAME
 
-Config::Settings
+Config::Settings - Parsing pleasant configuration files
 
 =head1 SYNOPSIS
 
@@ -177,9 +177,79 @@ Config::Settings
 
 =head1 DESCRIPTION
 
-I will extend the documentation for the next release, this is just to
-get the module up on CPAN so people interested can start playing with
-it.
+Better description to come.
+
+=head1 RATIONALE
+
+The first thing that probably comes to most people's mind when they
+see this module is "Why another Config:: module?". So I feel I should
+probably first explain what motivated me to write this module in the
+first place before I go into more details of how it works.
+
+There are already numerous modules for doing configuration files
+available on CPAN. L<YAML> appears to be a prefered module, as do
+L<Config::General>. There are of course also modules like
+L<Config::Any> which lets be open to many formats instead of being
+bound to any particular one, but this modules only supports what is
+already implemented in another module so if one feels one is not
+entirely happy with any format with an implementation on CPAN, it
+doesn't really doesn't solve the fundamental issue that was my
+incentive to implement a new format.
+
+=head2 YAML
+
+So let us have a look at the other formats. As previously mentioned,
+one of the more popular formats today appears to be YAML. YAML isn't
+really a configuration file format as such, it's a serialization
+format. It's just better than the more riddiculous alternatives like
+say XML. It's well documented which is an important feature and
+reading it, unlike XML, doesn't require a whole lot of brain power
+for either a human or a machine. A problem with YAML is the
+whitespace and tab sensitivity. Some will of course not call this a
+problem. After all, python is constructed on the very same principle,
+but this isn't python. This is perl. Chances are that if a python-ish
+structure had been more appropriate for your brain, you would already
+be using python and not reading the documentation for this module.
+
+But more importantly, this sensitivity is also a problem for people
+who are not familiar with the format. When I work on a Catalyst
+project, I seldom work alone. I work with graphic designers, I work
+with administrators, I work with a lot of people who is not likely to
+ever have encountered YAML before. Now, YAML *is* easy to read, but
+unfortunately it's not always easy to write. And sometimes, these
+people who I am working with needs to make a change to the settings
+for an application. They make the change, hit tab a few times to
+make the element position correctly, save the file, and voila it
+explodes without it really being obvious why.
+
+=head2 Config::General
+
+A different format that has recently become more popular is the
+L<Config::General> module. This module has adopted the format used
+by Apache. It's a mixture of markup language and simple key/value
+pairs. And in light of what I talked about with regards to YAML, this
+certainly is a better alternative. More people has configured
+Apache, and even if they haven't it's still more obvious how to
+modify the configuration file. The syntax of the format is to a much
+larger extent self-documenting and this is an important feature for a
+configuration file format. So what is the problem with this module?
+
+For starters, it occationally becomes *too* simple. There is for
+instance no way of constructing a single element array in it, or
+really, a good way of specifying an array at all. An array in the
+Config::General sense is more about a directive being specified
+multiple times, not constructing arrays. However, I can see why the
+decision to keep this out of the configuration format was made.
+Staying true to the Apache format and allowing real arrays really
+cannot be done. Another thing that bothers me about this format is
+the weird way it uses something that looks like a markup language
+to declare sections. I don't like this, I always tend to forget
+closing tags for more complicated data structures. Such structures
+rarely exists in a real Apache configuration file, but are very
+common in a configuration file for a perl program. And the closing
+tags are also uneccesarily long. Their long name does nothing to
+help me remember which closing tag belongs to which starting tag,
+it's really just noise in a configuration file.
 
 =head1 METHODS
 

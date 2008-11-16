@@ -1,5 +1,5 @@
 --- 
-abstract: ~
+abstract: Parsing pleasant configuration files
 author: 
   - Anders Nor Berle <berle@cpan.org>
 build_requires: 
@@ -19,4 +19,4 @@ no_index:
     - t
 requires: 
   Parse::RecDescent: 1.95.1
-version: 0.00_01
+version: 0.00_02
