@@ -1,12 +1,12 @@
 package Config::Settings;
 
-use Carp qw/croak/;
+use Carp qw/confess/;
 use Parse::RecDescent;
 
 use strict;
 use warnings;
 
-our $VERSION = '0.00_02';
+our $VERSION = '0.00_03';
 
 my $parser = Parse::RecDescent->new (<<'EOF');
 config:
@@ -17,7 +17,7 @@ scope:
   { $return = [ 'SCOPE',@{ $item[1] } ] }
 
 assignment:
-  deep_assignment | direct_assignment | <error>
+  deep_assignment | direct_assignment | true_assignment | <error>
 
 deep_assignment:
   keyword keyword value
@@ -27,11 +27,15 @@ direct_assignment:
   keyword value
   { $return = [ $item[1] => $item[2] ]; 1 }
 
+true_assignment:
+  keyword
+  { $return = [ $item[1] => 1 ]; 1 }
+
 keyword:
   integer | string | bareword
 
 value:
-  integer | string | list | hash
+  integer | string | list | hash | symbol
 
 bareword:
   /[\w:]+/
@@ -51,12 +55,24 @@ hash:
   "{" scope "}"
   { $return = $item[2]; 1 }
 
+symbol:
+  bareword
+  { $return = [ 'SYMBOL',$item[1] ]; 1 }
+
 EOF
+
+my %default_symbols = (
+  null  => undef,
+  true  => 1,
+  false => '',
+);
 
 sub new {
   my $class = shift;
 
   my $node = (ref $_[0] eq 'HASH' ? $_[0] : { @_ });
+
+  $node->{symbol_table} ||= { %default_symbols };
 
   return bless $node,$class;
 }
@@ -64,7 +80,7 @@ sub new {
 sub parse_file {
   my ($self,$file) = @_;
 
-  open (my $fh,$file) or croak $!;
+  open (my $fh,$file) or confess $!;
 
   my $content = do { local $/; <$fh> };
 
@@ -138,12 +154,30 @@ sub _process_value {
     my $value_type = shift @$value;
 
     if ($value_type eq 'SCOPE') {
-      return $self->_process_scope ($value);
+      $value = $self->_process_scope ($value);
     } elsif ($value_type eq 'LIST') {
-      return [ map { $self->_process_value ($_) } @$value ];
+      $value = [ map { $self->_process_value ($_) } @$value ];
+    } elsif ($value_type eq 'SYMBOL') {
+      $value = $self->_process_symbol (@$value);
     } else {
-      die "Uh oh, this should never happen";
+      confess "Uh oh, this should never happen";
     }
+  }
+
+  return $value;
+}
+
+sub _process_symbol {
+  my ($self,$symbol) = @_;
+
+  my $value;
+
+  if (exists $self->{symbol_table}->{ $symbol }) {
+    my $symbol_entry = $self->{symbol_table}->{ $symbol };
+
+    $value = (ref $symbol_entry eq 'CODE' ? $symbol_entry->() : $symbol_entry);
+  } else {
+    confess "No such symbol '$symbol' in symbol table";
   }
 
   return $value;
@@ -177,9 +211,7 @@ Config::Settings - Parsing pleasant configuration files
 
 =head1 DESCRIPTION
 
-Better description to come.
-
-=head1 RATIONALE
+=head2 Rationale
 
 The first thing that probably comes to most people's mind when they
 see this module is "Why another Config:: module?". So I feel I should
@@ -195,8 +227,6 @@ already implemented in another module so if one feels one is not
 entirely happy with any format with an implementation on CPAN, it
 doesn't really doesn't solve the fundamental issue that was my
 incentive to implement a new format.
-
-=head2 YAML
 
 So let us have a look at the other formats. As previously mentioned,
 one of the more popular formats today appears to be YAML. YAML isn't
@@ -221,8 +251,6 @@ people who I am working with needs to make a change to the settings
 for an application. They make the change, hit tab a few times to
 make the element position correctly, save the file, and voila it
 explodes without it really being obvious why.
-
-=head2 Config::General
 
 A different format that has recently become more popular is the
 L<Config::General> module. This module has adopted the format used
@@ -251,19 +279,77 @@ tags are also uneccesarily long. Their long name does nothing to
 help me remember which closing tag belongs to which starting tag,
 it's really just noise in a configuration file.
 
+=head2 Design goals
+
+In the rationale I layed out above, I pointed out some important
+qualities in a configuration file format.
+
+=over 4
+
+=item It must be easy to read.
+
+=item It must be easy to write.
+
+=item The syntax must to a high degree be self-documenting.
+
+=item It should still allow somewhat complex data structures.
+
+=item It should not have riddiculously redundant syntax as its only option.
+
+=back
+
+These qualities can sometimes be incompatible with each other,
+depending on how they are achieved. And there's in any case no such
+thing as a perfect solution. The best one can hope to achieve is
+something we can be comfortable with.
+
+One configuration format I've been happy with previously has been the
+BIND (The nameserver) configuration format. It's very C/perl-ish,
+allows you to express somewhat complex configuration structures with a
+very simlpe syntax, and most importantly, it just "feels right". So I
+looked around on CPAN to see if I could find a parser that would allow
+me to parse something that was at least somewhat similar, but couldn't
+find any. So I started this module as a project both to see if a
+reasonable parser for such a format could be made and to learn how to
+use the L<Parse::RecDescent> module.
+
+  # This is an example from the default named.conf on my system.
+
+  zone "localhost" {
+    type master;
+    file "master/localhost-forward.db";
+  };
+
 =head1 METHODS
 
 =head2 new
 
   my $parser = Config::Settings->new;
 
+Constructs a new configuration file parser. See below for constructor
+arguments.
+
 =head2 parse
 
   my $settings = $parser->parse ($string);
 
+Parses a text string. This will soon be extended to also allow
+references and filehandles, but right now only plain strings are
+supported.
+
 =head2 parse_file
 
   my $settings = $parser->parse_file ($filename);
+
+Sugar for parsing the content of a given file.
+
+=head1 CONSTRUCTOR ARGUMENTS
+
+=head2 symbol_table
+
+  my $parser = Config::Settings->new (symbol_table => {});
+
+Specifies a custom symbol table to use.
 
 =head1 EXAMPLES
 
