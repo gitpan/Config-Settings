@@ -6,7 +6,7 @@ use Parse::RecDescent;
 use strict;
 use warnings;
 
-our $VERSION = '0.00_03';
+our $VERSION = '0.00_04';
 
 my $parser = Parse::RecDescent->new (<<'EOF');
 config:
@@ -320,6 +320,112 @@ use the L<Parse::RecDescent> module.
     file "master/localhost-forward.db";
   };
 
+=head1 SPECIFICATIONS
+
+=head2 Overview
+
+And here they are, the raw, improvised specifications for the format.
+I'll try to find a better way to specify the format before the
+production release, but for now this will have to do. When a plural of
+something is specified, the separator used will be specified
+inside the () part. For instance, "assignments(';')" means that multiple
+assignments are allowed, separated by the ';' character.
+
+  top: assignments(';')
+
+  assignment: key | key value | key key value
+
+  key: integer | string | bareword
+
+  value: integer | string | list | hash | symbol
+
+  integer: /\d+/
+
+  string: '"' <text> '"'
+
+  bareword: [\w:]+
+   
+  list: '[' values(' ') ']'
+
+  hash: '{' assignments(';') '}'
+
+  symbol: bareword
+
+=head2 Assignment
+
+As specified above, there are three different ways to assign something
+to a key. The first is the keyword style assignment. No value is
+specified, implicitly setting the key to a true value.
+
+  foo; # perl equivalent: { foo => 1 }
+
+The second way is the standard key/value type assignment.
+
+  foo "bar"; # perl equivalent: { foo => "bar" }
+
+The third is similar to the standard key/value type assignment, but
+works on one level deeper. You specify two keys, and the first key
+is implicitly refering to a hash (It will be converted to one if it
+isn't already) while the second key is a key for that hash. This is to
+allow constructs like this as seen in the earlier example:
+
+  zone "localhost" {
+    type master;
+    file "master/localhost.db";
+  };
+
+This is almost equivalent of doing:
+
+  zone {
+    localhost {
+      type master;
+      file "master/localhost.db";
+    };
+  };
+
+However, the latter example will overwrite any existing "zone" key,
+while the first will merge with an existing hash.
+
+=head2 Values
+
+There are three different types of values:
+
+=over 4
+
+=item Integer
+
+An integer number. More number types will be supported before
+a production release, but currently this is it.
+
+=item String
+
+A plain doublequoted string.
+
+=item List
+
+A collection of values enclosed in [] brackets separated by spaces.
+
+=item Hash
+
+A collection of assignments enclosed in {} brackets separated by
+semicolons.
+
+=item Symbol
+
+A bareword that is looked up in an internal symbol table and replaced
+with the value found there. A symbol that does not resolve will throw
+an error. The currently predefined symbols are "null", "true", and
+"false", respectively returning undef, 1, and an empty string.
+
+=back
+
+=head2 Keys
+
+Keys can be integers, strings, and barewords. Bareword matches the
+same as symbols, but when on the left hand side will not be looked up
+in the symbol table and instead just used as a literal value like when
+using the perl "=>" operator.
+
 =head1 METHODS
 
 =head2 new
@@ -349,7 +455,11 @@ Sugar for parsing the content of a given file.
 
   my $parser = Config::Settings->new (symbol_table => {});
 
-Specifies a custom symbol table to use.
+Specifies a custom symbol table to use. A symbol table is a regular
+hash table with the symbol name as key. The value may be anything, but
+if it's a coderef, it will be executed and the return value used. If
+you need the value to be an actual coderef, wrap it in another
+coderef.
 
 =head1 EXAMPLES
 
@@ -362,7 +472,8 @@ Specifies a custom symbol table to use.
 
     connect_info {
       dsn        "dbi:SQLite:dbname=__HOME__/db/myapp.db";
-      AutoCommit 1;
+      AutoCommit;
+      auto_savepoints;
     };
   };
 
