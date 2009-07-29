@@ -6,7 +6,7 @@ use Parse::RecDescent;
 use strict;
 use warnings;
 
-our $VERSION = '0.00_04';
+our $VERSION = '0.01';
 
 my $parser = Parse::RecDescent->new (<<'EOF');
 config:
@@ -467,7 +467,7 @@ coderef.
 
   name "MyApp";
 
-  Model::MyApp {
+  model "MyApp" {
     schema_class "MyApp::Schema";
 
     connect_info {
@@ -477,7 +477,7 @@ coderef.
     };
   };
 
-  View::TT {
+  view "TT" {
     ENCODING           "UTF-8";
     TEMPLATE_EXTENSION ".html";
     INCLUDE_PATH       "__HOME__/templates";
@@ -522,7 +522,7 @@ Anders Nor Berle E<lt>berle@cpan.orgE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2008 by Anders Nor Berle.
+Copyright 2009 by Anders Nor Berle.
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself. 
